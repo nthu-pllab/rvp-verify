@@ -10,3 +10,4 @@
 	path = riscv-binutils
 	url = https://github.com/gglangg/riscv-binutils.git
 	branch = fix-mulq-encoding
+	ignore = untracked
