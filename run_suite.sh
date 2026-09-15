@@ -14,7 +14,8 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AS=${AS:-$ROOT/riscv-binutils/build/gas/as-new}
 LD=${LD:-$ROOT/riscv-binutils/build/ld/ld-new}
-GCC=${RISCV_GCC:-$(command -v riscv64-unknown-elf-gcc || true)}
+GCC=${RISCV_GCC:-${RISCV:+$RISCV/bin/riscv64-unknown-elf-gcc}}
+GCC=${GCC:-$(command -v riscv64-unknown-elf-gcc || true)}
 SAILDIR=${SAILDIR:-$ROOT/sail-riscv}
 SAIL=${SAIL:-$SAILDIR/build/c_emulator/sail_riscv_sim}
 PENV=$ROOT/env/sail                         # model_test.h + link.ld
@@ -44,8 +45,11 @@ scan_suite() { # $1=suite dir  $2=xlen
   find "$suite" -name '*.S' ! -path '*/env/*' | sort | while read -r src; do
     n=$((n+1))
     [ "$LIMIT" -gt 0 ] && [ "$n" -gt "$LIMIT" ] && break
-    local name verdict rc
+    local name page id verdict rc
     name=$(basename "$src" .S)
+    page=$(basename "$(dirname "$src")")
+    # tests with the same name exist on several spec pages: key files by page too
+    id="${page}_${name}"
     rm -f "$T"/t.*
     if ! "$GCC" -E -march=$ppmarch -mabi=$mabi -DXLEN=$xlen -DTEST_CASE_1=True -I "$PENV" -I "$AENV" "$src" -o "$T/t.pp.s" 2>"$T/t.err"; then
       verdict=PP_FAIL
@@ -64,16 +68,16 @@ scan_suite() { # $1=suite dir  $2=xlen
       # a "PASS" with a trap loop note in the log is really a failure
       if [ "$verdict" = PASS ] && grep -q "trap loop" "$T/t.log"; then verdict=TRAP_LOOP; fi
     fi
-    printf '%s\trv%s\t%s\n' "$name" "$xlen" "$verdict" >> "$OUT/results.tsv"
+    printf '%s/%s\trv%s\t%s\n' "$page" "$name" "$xlen" "$verdict" >> "$OUT/results.tsv"
     if [ "$verdict" = PASS ]; then
-      printf '[%3d/%s rv%s] %-26s PASS\n' "$n" "$total" "$xlen" "$name"
+      printf '[%3d/%s rv%s] %-34s PASS\n' "$n" "$total" "$xlen" "$page/$name"
     else
-      printf '[%3d/%s rv%s] %-26s ** %s **\n' "$n" "$total" "$xlen" "$name" "$verdict"
-      [ -s "$T/t.err" ] && cp "$T/t.err" "$OUT/fail_rv${xlen}_${name}.err"
-      [ -s "$T/t.log" ] && cp "$T/t.log" "$OUT/fail_rv${xlen}_${name}.log"
+      printf '[%3d/%s rv%s] %-34s ** %s **\n' "$n" "$total" "$xlen" "$page/$name" "$verdict"
+      [ -s "$T/t.err" ] && cp "$T/t.err" "$OUT/fail_rv${xlen}_${id}.err"
+      [ -s "$T/t.log" ] && cp "$T/t.log" "$OUT/fail_rv${xlen}_${id}.log"
     fi
     # keep the signature for later coverage/diff use
-    [ -s "$T/t.sig" ] && cp "$T/t.sig" "$OUT/sig_rv${xlen}_${name}.sig"
+    [ -s "$T/t.sig" ] && cp "$T/t.sig" "$OUT/sig_rv${xlen}_${id}.sig"
   done
 }
 

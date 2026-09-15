@@ -1,7 +1,0 @@
-using /Users/gene/workspace/pllab/act_scan3_results/tmp/t.sig for test-signature output.
-enabling unratified extensions.
-HTIF located at 0x80001000
-begin_signature: 0x80003110
-end_signature: 0x800035b0
-Entry point: 0x80000000
-SUCCESS
