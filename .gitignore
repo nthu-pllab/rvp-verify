@@ -1,0 +1,6 @@
+ctg-venv/
+regen_out/
+results/current/
+__pycache__/
+*.egg-info/
+.DS_Store
