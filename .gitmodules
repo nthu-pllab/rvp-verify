@@ -1,0 +1,12 @@
+[submodule "sail-riscv"]
+	path = sail-riscv
+	url = https://github.com/nthu-pllab/sail-riscv.git
+	branch = pext-020-rebase
+[submodule "rvp-test-suite"]
+	path = rvp-test-suite
+	url = git@github.com:nthu-pllab/rvp-test-suit.git
+	branch = align-020-names
+[submodule "riscv-binutils"]
+	path = riscv-binutils
+	url = https://github.com/gglangg/riscv-binutils.git
+	branch = fix-mulq-encoding
