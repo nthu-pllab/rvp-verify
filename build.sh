@@ -36,9 +36,17 @@ fi
 command -v sail >/dev/null || { echo "sail not on PATH: opam install sail.0.20.2 && eval \$(opam env)" >&2; exit 2; }
 SR="$ROOT/sail-riscv"
 if [ $FRESH = 1 ]; then rm -rf "$SR/build"; fi
+# upstream's gdbserver pulls asio 1.36.0 from sourceforge, which sometimes
+# answers 403. Set ASIO_SRC to a local unpacked asio tree (the `asio/` dir
+# containing include/asio.hpp, e.g. from
+# https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-36-0.tar.gz)
+# to skip the download.
 if [ ! -f "$SR/build/CMakeCache.txt" ]; then
-  echo "== building sail-riscv (first time, via build_simulator.sh)"
-  (cd "$SR" && ./build_simulator.sh)
+  echo "== building sail-riscv (first time)"
+  cmake -S "$SR" -B "$SR/build" -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+      -DDOWNLOAD_GMP=TRUE -DENABLE_RISCV_TESTS=TRUE \
+      ${ASIO_SRC:+-DFETCHCONTENT_SOURCE_DIR_ASIO="$ASIO_SRC"}
+  cmake --build "$SR/build" -j"$JOBS"
 else
   echo "== rebuilding sail-riscv (incremental)"
   cmake --build "$SR/build" -j"$JOBS"
