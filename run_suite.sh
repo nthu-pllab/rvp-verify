@@ -3,7 +3,7 @@
 #
 # Pipeline per test: gcc -E (macros from env/) → P-aware as → ld →
 # sail_riscv_sim with --test-signature.
-# Verdicts: PASS / PP_FAIL / AS_FAIL / LD_FAIL / TIMEOUT / RUN_FAIL(rc=N)
+# Verdicts: PASS / PP_FAIL / AS_FAIL / LD_FAIL / TIMEOUT / INST_LIMIT / RUN_FAIL(rc=N)
 #
 # Usage:  LIMIT=2 bash run_suite.sh   # smoke: 2 tests per suite
 #         bash run_suite.sh           # full (446 rv32 + 318 rv64)
@@ -62,11 +62,13 @@ scan_suite() { # $1=suite dir  $2=xlen
         --test-signature "$T/t.sig" --signature-granularity 4 \
         --inst-limit "$INST_LIMIT" "$T/t.elf" >"$T/t.log" 2>&1
       rc=$?
-      if   [ $rc -eq 0 ];   then verdict=PASS
+      # The simulator prints SUCCESS when the test reaches the HTIF exit. It
+      # also exits 0 when the instruction limit runs out, so the exit code
+      # alone is not enough to call a test passed.
+      if grep -q '^SUCCESS' "$T/t.log"; then verdict=PASS
       elif [ $rc -eq 124 ]; then verdict=TIMEOUT
+      elif [ $rc -eq 0 ];   then verdict=INST_LIMIT
       else verdict="RUN_FAIL(rc=$rc)"; fi
-      # a "PASS" with a trap loop note in the log is really a failure
-      if [ "$verdict" = PASS ] && grep -q "trap loop" "$T/t.log"; then verdict=TRAP_LOOP; fi
     fi
     printf '%s/%s\trv%s\t%s\n' "$page" "$name" "$xlen" "$verdict" >> "$OUT/results.tsv"
     if [ "$verdict" = PASS ]; then

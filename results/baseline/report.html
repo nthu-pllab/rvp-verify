@@ -1,35 +1,53 @@
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>RVP 020 Sail Test Report</title>
+<html lang="en"><head><meta charset="utf-8"><title>RVP 020 Sail Test Report</title>
 <style>
- body { font: 14px/1.5 -apple-system, Helvetica, Arial, sans-serif; margin: 2rem auto; max-width: 60rem; color: #222; }
+ body { font: 14px/1.5 -apple-system, Helvetica, Arial, sans-serif; margin: 2rem auto; max-width: 60rem; padding: 0 1rem; color: #222; }
  h1 { border-bottom: 2px solid #333; padding-bottom: .3rem; }
  table { border-collapse: collapse; width: 100%; margin: .6rem 0 1.4rem; }
- td, th { border: 1px solid #ccc; padding: .25rem .6rem; text-align: left; }
+ td, th { border: 1px solid #ccc; padding: .25rem .6rem; text-align: left; vertical-align: top; }
+ th { background: #f0f0f0; }
  td.k { width: 14rem; font-weight: 600; background: #f6f6f6; }
  tr.ok td:last-child { color: #0a7a0a; font-weight: 600; }
  tr.bad td:last-child { color: #b00020; font-weight: 700; }
  .big { font-size: 1.25rem; font-weight: 700; }
+ .mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; word-break: break-word; }
+ details { margin: .4rem 0; }
+ p.note { color: #555; }
 </style></head><body>
 <h1>RISC-V P Extension (RVP draft 020) — Sail Model Test Report</h1>
 
 <h2>Environment</h2>
-<table><tr><td class='k'>Date</td><td>2026-09-15</td></tr>
-<tr><td class='k'>Model under test</td><td>sail-riscv `pext-020-rebase` — f62b7011 Update P instructions to draft 020 encodings</td></tr>
+<table><tr><td class='k'>Date</td><td>2026-09-16</td></tr>
+<tr><td class='k'>Model under test</td><td>sail-riscv `pext-020-rebase` — 46465b79 Add experimental support for the RISC-V P extension (RVP 020)</td></tr>
 <tr><td class='k'>Simulator</td><td>build/c_emulator/sail_riscv_sim (--enable-experimental-extensions, --test-signature)</td></tr>
+<tr><td class='k'>Sail</td><td>Sail 0.20.2 (sail @ opam-v2.5.1 0.20.2)</td></tr>
 <tr><td class='k'>Run configs</td><td>build/config/rv32d_v128_e32.json / rv64d_v128_e64.json</td></tr>
-<tr><td class='k'>Assembler</td><td>GNU assembler (GNU Binutils) 2.44.50.20250628 (ruyisdk p-dev + mulq/mulqr funct4 fix)</td></tr>
-<tr><td class='k'>Test suite</td><td>nthu-pllab/rvp-test-suit `align-020-names` — 7363bf1 Import lab-regenerated tests</td></tr>
-<tr><td class='k'>Suite origin</td><td>riscv_ctg (lab P templates) from per-page cgf files; riscv-arch-test TEST_* macros</td></tr>
-<tr><td class='k'>Method</td><td>assemble → link → execute on Sail; PASS = clean HTIF exit, no illegal instruction, no trap loop; memory signature captured per test (granularity 4)</td></tr></table>
+<tr><td class='k'>Assembler</td><td>GNU assembler (GNU Binutils) 2.44.50.20250628 — riscv-binutils 43db80de77b RISC-V: Fix mulq/mulqr encoding: funct4 should be 0b1010, not 0b1011</td></tr>
+<tr><td class='k'>Test suite</td><td>rvp-test-suite `align-020-names` — 28f93e5 Import lab-regenerated tests</td></tr>
+<tr><td class='k'>Suite origin</td><td>riscv_ctg (lab P templates) from per-instruction-group cgf files; riscv-arch-test TEST_* macros</td></tr>
+<tr><td class='k'>Method</td><td>preprocess → assemble → link → execute on Sail; PASS = reached the HTIF exit (SUCCESS) with no illegal instruction; memory signature captured per test (granularity 4)</td></tr></table>
 
 <h2>Specification</h2>
 <table><tr><td class='k'>P specification</td><td>RVP draft 020 (2026-03-21), https://www.jhauser.us/RISCV/ext-P/</td></tr>
-<tr><td class='k'>ISA (rv32)</td><td>RV32IPZicsr_Zba_Zbb_Zbkb (tests borrow non-P instructions)</td></tr>
-<tr><td class='k'>ISA (rv64)</td><td>RV64IPZicsr_Zba_Zbb_Zbkb</td></tr>
-<tr><td class='k'>Coverage definitions</td><td>rv32ip_cgf/pN.cgf, rv64ip_cgf/pN.cgf (per spec page)</td></tr></table>
+<tr><td class='k'>ISA (rv32)</td><td>RV32IP_Zicsr_Zba_Zbb_Zbkb (tests borrow a few non-P instructions)</td></tr>
+<tr><td class='k'>ISA (rv64)</td><td>RV64IP_Zicsr_Zba_Zbb_Zbkb</td></tr>
+<tr><td class='k'>Coverage definitions</td><td>rvp-test-suite/rv32ip_cgf/*.cgf, rv64ip_cgf/*.cgf</td></tr></table>
 
 <h2>Summary</h2>
 <p class="big">764/764 PASS &nbsp; (rv32: 446/446 · rv64: 318/318)</p>
+<p class="note">PASS means the test assembled, linked and ran to a clean exit on the model with no
+illegal-instruction trap or trap loop. The memory signatures are captured per test and diffed
+against <code>results/baseline/</code> to detect semantic drift between model versions; they are
+produced by this model, not by an independent reference implementation.</p>
+
+<h2>Coverage</h2>
+<table>
+<tr><th>XLEN</th><th>P mnemonics with at least one test</th><th>P mnemonics implemented in the model</th><th>implemented but untested</th></tr>
+<tr><td>rv32</td><td>422</td><td>445</td><td>23</td></tr>
+<tr><td>rv64</td><td>290</td><td>311</td><td>21</td></tr>
+</table>
+<details><summary>rv32: 23 implemented mnemonics without a test</summary><p class='mono'>mqrwacc mqwacc pmax.dw pmaxu.dw pmin.dw pminu.dw ppaire.b ppaire.db ppaireo.b ppaireo.db ppairo.b ppairo.db ppairoe.b ppairoe.db psshl.dhs psshl.dws psshl.hs psshlr.dhs psshlr.dws psshlr.hs slx sshl sshlr</p></details>
+<details><summary>rv64: 21 implemented mnemonics without a test</summary><p class='mono'>pnclipp.b pnclipp.h pnclipp.w pnclipup.b pnclipup.h pnclipup.w ppaire.b ppaireo.b ppairo.b ppairoe.b predsum.bs predsumu.bs predsumu.hs pssh1sadd.w psshl.hs psshl.ws psshlr.hs psshlr.ws shl shlr slx</p></details>
 
 <h2>Results</h2>
 <table>

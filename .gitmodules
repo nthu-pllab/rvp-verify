@@ -4,7 +4,7 @@
 	branch = pext-020-rebase
 [submodule "rvp-test-suite"]
 	path = rvp-test-suite
-	url = git@github.com:nthu-pllab/rvp-test-suit.git
+	url = https://github.com/nthu-pllab/rvp-test-suit.git
 	branch = align-020-names
 [submodule "riscv-binutils"]
 	path = riscv-binutils

@@ -1,93 +1,139 @@
-# rvp-verify — RISC-V P 擴展 (RVP draft 020) Sail 模型驗證環境
+# rvp-verify — RISC-V P extension (RVP draft 020) verification for sail-riscv
 
-一站式打包:`git clone --recursive` → `./build.sh` → `./run_suite.sh`,就能對
-sail-riscv 的 P 擴展實作跑完整測試套件(rv32 446 + rv64 318 顆)並產生報告。
+A self-contained environment to build the [sail-riscv](https://github.com/riscv/sail-riscv)
+model with the proposed P (packed-SIMD / DSP) extension, run a suite of
+764 generated P tests on it and produce a report. It is the verification
+evidence behind the P-extension pull request to riscv/sail-riscv.
 
-規格權威:**RVP draft 020 (2026-03-21)** — https://www.jhauser.us/RISCV/ext-P/
+Specification: RVP draft 020 (2026-03-21) by John Hauser,
+https://www.jhauser.us/RISCV/ext-P/ (`RVP-baseInstrs-020.pdf`,
+`RVP-instrEncodings-020.pdf`, `RVP-baseInstrs-Sail-020.txt`).
 
-## 內容物
-
-| 路徑 | 是什麼 |
-|---|---|
-| `sail-riscv/` | submodule → nthu-pllab/sail-riscv,branch `pext-020-rebase`(被測物;`upstream` remote = riscv/sail-riscv) |
-| `rvp-test-suite/` | submodule → nthu-pllab/**rvp-test-suit**(GitHub 上的名字少一個 e,是同一個東西),branch `align-020-names`:764 顆 riscv_ctg 產生的 `.S` + cgf。**私有 repo**,需要 nthu-pllab 組織權限 + SSH key |
-| `riscv-binutils/` | submodule → gglangg/riscv-binutils,branch `fix-mulq-encoding`(ruyisdk p-dev + mulq/mulqr funct4 修正) |
-| `env/arch-test/` | riscv-arch-test 的 `arch_test.h` + P 版 `test_macros.h`(TEST_PAIR_* 巨集) |
-| `env/sail/` | `model_test.h` + `link.ld`(Sail 端 target 檔) |
-| `riscv-ctg/` | 實驗室改造版測資產生器(P 模板 `riscv_ctg/data/p.yaml`、語意在 `dsp_function.py`) |
-| `coverage/dataset.cgf` | ctg 的共用 YAML anchor 資料集 |
-| `results/baseline/` | 基準結果:report.html、results.tsv、每顆測試的簽章(拿來 diff 用) |
-| `VENDOR.md` | 上面 vendor 進來的檔案各自來自哪個 commit、改了什麼 |
-| `build.sh` / `run_suite.sh` / … | 建置與驗證腳本,見下 |
-
-## 建置(一次性)
-
-前置需求:C/C++ toolchain、cmake、python3、opam 裝好 **Sail 0.20.2**
-(`opam install sail.0.20.2 && eval $(opam env)`),以及一個
-`riscv64-unknown-elf-gcc`(任何近代版本;只用來做 `-E` 預處理)——放在 PATH,
-或設 `RISCV=<toolchain prefix>`,或 `RISCV_GCC=<完整路徑>`。
-
-```bash
-git clone --recursive <this-repo-url>
+```
+git clone --recursive <this repo>
 cd rvp-verify
-./build.sh          # 建 riscv-binutils(as-new/ld-new)+ sail-riscv(sail_riscv_sim)
+./build.sh            # P-aware binutils + sail-riscv simulator
+./run_suite.sh        # 764 tests -> results/current/
+python3 gen_report.py # results/current/report.html
 ```
 
-`./build.sh --fresh` 兩個都從頭重建;之後改了 Sail 模型只要再跑 `./build.sh`(增量)。
+A `README.zh-TW.md` with the same content in Chinese is kept for the lab.
 
-## 跑測試
+## Contents
 
-```bash
-LIMIT=2 ./run_suite.sh       # smoke:每套 2 顆
-./run_suite.sh               # 完整 764 顆 → results/current/
-python3 gen_report.py        # 從 results/current 產生 report.html
+| Path | What it is |
+|---|---|
+| `sail-riscv/` | submodule: the model under test (nthu-pllab fork of riscv/sail-riscv, branch `pext-020-rebase`) |
+| `rvp-test-suite/` | submodule: 764 riscv_ctg-generated `.S` tests (446 RV32, 318 RV64) plus the cgf coverpoint files they were generated from |
+| `riscv-binutils/` | submodule: P-aware binutils (ruyisdk `p-dev` branch plus a `mulq`/`mulqr` encoding fix) |
+| `env/arch-test/` | riscv-arch-test `arch_test.h`, `encoding.h` and `test_macros.h` extended with the register-pair `TEST_PAIR_*` macros |
+| `env/sail/` | `model_test.h` and `link.ld` for the Sail target |
+| `riscv-ctg/` | the test generator with P support (templates in `riscv_ctg/data/p.yaml`, semantics in `dsp_function.py`) |
+| `coverage/dataset.cgf` | shared YAML anchors referenced by the suite's cgf files |
+| `results/baseline/` | reference run: `report.html`, `results.tsv` and one memory signature per test |
+| `build.sh`, `run_suite.sh`, `gen_report.py`, `verify_insn.sh`, `regen_tests.sh`, `setup_ctg_venv.sh` | scripts, described below |
+| `VENDOR.md` | provenance of the vendored files and what was changed in them |
+
+## Building
+
+Requirements: a C/C++ toolchain, CMake, Python 3, opam with Sail 0.20.2
+(`opam install sail.0.20.2 && eval $(opam env)`), and a
+`riscv64-unknown-elf-gcc` for preprocessing only (any recent version; on
+`PATH`, or set `RISCV=<prefix>` or `RISCV_GCC=<path>`).
+
+```
+./build.sh            # incremental; builds binutils only if missing
+./build.sh --fresh    # reconfigure and rebuild both from scratch
 ```
 
-預期結果:**764/764 PASS**。`results/current/sig_rv{32,64}_<page>_<test>.sig`
-是每顆測試的記憶體簽章(同名測試在不同 spec page 各有一顆,所以檔名帶 page),
-可與 `results/baseline/` 逐檔 diff 確認語意沒有漂移:
+`build.sh` produces `riscv-binutils/build/gas/as-new`,
+`riscv-binutils/build/ld/ld-new` and
+`sail-riscv/build/c_emulator/sail_riscv_sim`. Upstream sail-riscv fetches
+asio from sourceforge at configure time; if that download fails, unpack
+[asio 1.36.0](https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-36-0.tar.gz)
+somewhere and run `ASIO_SRC=<dir>/asio ./build.sh`.
 
-```bash
+## Running the suite
+
+```
+LIMIT=2 ./run_suite.sh   # smoke test: two tests per suite
+./run_suite.sh           # full run -> results/current/
+python3 gen_report.py    # -> results/current/report.html
+```
+
+For every test: `gcc -E` (with `-march=rv32i`/`rv64i` so that the
+`TEST_PAIR_*` macros see `__riscv_xlen`), the P-aware `as`
+(`-march=rv{32,64}ip_zicsr_zba_zbb_zbkb`, the tests borrow a few non-P
+instructions), `ld`, then `sail_riscv_sim --enable-experimental-extensions
+--test-signature`. Verdicts are `PASS`, `PP_FAIL`, `AS_FAIL`, `LD_FAIL`,
+`TIMEOUT`, `INST_LIMIT` (no HTIF exit within the instruction budget) or
+`RUN_FAIL(rc=N)`. Tool locations can be overridden
+with `AS`, `LD`, `SAILDIR`, `SAIL`, `RISCV_GCC` and `OUT`.
+
+Expected result: 764/764 PASS. The per-test signatures land in
+`results/current/sig_rv{32,64}_<group>_<test>.sig` (the same test name can
+occur in several instruction groups, hence the group in the file name) and
+can be compared with the reference run:
+
+```
 diff -rq results/baseline results/current --exclude=report.html --exclude=tmp
 ```
 
-工具位置都可用環境變數覆蓋(`AS`、`LD`、`SAILDIR`、`SAIL`、`RISCV_GCC`、`OUT`)。
+## What the result means
 
-單顆指令快查(編碼 + 語意,expected 自己從 020 spec 算):
+Only the Sail side is exercised here; there is no second implementation to
+compare against, since no P-enabled Spike or other reference for draft 020
+is publicly available yet. PASS means the test assembled, linked and ran to
+the HTIF exit (the simulator's SUCCESS line) with no illegal instruction. The
+signatures are produced by the model itself, so diffing them shows changes
+between model versions, not disagreement with the specification.
 
-```bash
+Semantics were checked separately against Hauser's `RVP-baseInstrs-Sail-020.txt`
+(Sail-style pseudo-code for the instructions that changed relative to the
+old P proposal), and encodings were round-tripped through binutils
+(`verify_insn.sh`, below). The report's Coverage section lists, per XLEN,
+how many of the model's P mnemonics have at least one test and which do not.
+
+## Checking a single instruction
+
+```
 ./verify_insn.sh aadd "6,4=>5" "-0x80000000,0x7fffffff=>0xffffffff"
-XLEN=64 ./verify_insn.sh <mnem> "rs1,rs2=>expected"
+XLEN=64 ./verify_insn.sh <mnemonic> "rs1,rs2=>expected"
 ```
 
-## 方法論(誠實聲明)
+Assembles `<mnemonic> a5,a3,a4` with binutils, checks that the model decodes
+the same bytes back to the same mnemonic (catches wrong bits and clause
+collisions), then runs each `rs1,rs2=>expected` case and compares `rd`. You
+supply `expected` from the specification. Only the three-register form is
+supported.
 
-這是 **Sail 單邊的 signature-capture run,不是 DUT-vs-Reference 差分比對**
-(P-enabled 的 spike fork 尚未公開可用)。PASS 的定義:乾淨 HTIF 結束、無
-illegal instruction、無 trap loop,並擷取記憶體簽章。跨版本的語意回歸靠
-「新簽章 vs 基準簽章」diff 把關;測試向量的覆蓋意圖由 `rvp-test-suite/*_cgf/`
-的 coverpoint 定義。
+## Regenerating tests (advanced)
 
-## 在這裡改 Sail 模型
-
-`sail-riscv/` 是完整的 git checkout(branch `pext-020-rebase`,origin =
-nthu-pllab fork,upstream = riscv/sail-riscv),可以直接在裡面 commit、rebase、push。
-改完後:`./build.sh` → `./run_suite.sh` → diff 簽章。要更新這個 repo 釘住的
-版本時,在頂層 `git add sail-riscv && git commit`。
-
-## 重新產生測資(進階)
-
-```bash
-./setup_ctg_venv.sh            # 建 ctg-venv/(可重跑;--fresh 全重建)
-./regen_tests.sh rv32 p20      # 重生一個 cgf page 到 ./regen_out/
+```
+./setup_ctg_venv.sh          # create ctg-venv/ (idempotent; --fresh to rebuild)
+./regen_tests.sh rv32 p20    # regenerate one cgf group into ./regen_out/
 ```
 
-產出的 `.S` 要**人工審核後**才複製進 `rvp-test-suite/`,不是自動採用。
-兩個坑:① cgf/`p.yaml` 的 page 編號對應 **draft 015** 的 PDF 頁碼(018/020 會位移),
-對外溝通一律用指令名;② p.yaml 的 Page-22–24 covergroup 還是 015 命名
-(`ppack.*` = 020 的 `ppaire.*`),重生那幾頁會吐出舊檔名,要重套 020 改名。
+riscv_ctg is a constraint solver plus template engine: the cgf coverpoints
+say what to cover and `p.yaml` says which values may be drawn; it does not
+know legal operand ranges itself, so the assembler is the only range check.
+Regenerated `.S` files are reviewed by hand before being copied into
+`rvp-test-suite/`; nothing is adopted automatically. The cgf/`p.yaml` groups
+are named after the pages of an older encodings draft (015); use instruction
+names, not group numbers, when communicating outside this repository.
 
-其他注意:預處理必須 `-march=rv32i`/`rv64i`(gcc 才會定義 `__riscv_xlen`,
-`TEST_PAIR_*` 巨集靠它把關,否則靜默消失);組譯要
-`-march=rv{32,64}ip_zicsr_zba_zbb_zbkb`(測試借用了非 P 指令);rv32 連結要
-`-m elf32lriscv`。這些 `run_suite.sh` 都已內建。
+## Known toolchain issues
+
+The P-aware binutils used here is the ruyisdk `p-dev` branch. Two encoding
+bugs were found while cross-checking against draft 020 and have been
+reported: `mulq`/`mulqr` used funct4 1011 instead of 1010 (fixed in the
+submodule's branch), and RV32 `psshl.dhs`/`psshl.dws` are emitted with
+funct3 100 instead of 010 (the model follows the spec, so these two cannot
+be round-tripped). The 020-only mnemonics `pnclipp.*`/`pnclipup.*` are not
+known to this binutils yet.
+
+## License
+
+BSD-3-Clause for the scripts and files written for this repository; see
+`LICENSE` for the licenses of the vendored riscv-ctg and riscv-arch-test
+material. The submodules are separate projects under their own licenses.

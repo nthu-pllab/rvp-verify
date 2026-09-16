@@ -1,5 +1,5 @@
 6f5ca309
-ffffffff
+ffe00000
 000002aa
 ffffffff
 ffffffff
@@ -27,13 +27,11 @@ ffffffff
 ffffffff
 ffffffff
 ffffffff
-ffffffff
-ffffffff
+ffff0000
+ffffff00
 80000000
-ffffffff
-ffffffff
-80000000
-80000000
+fffffffc
+fffffffe
 80000000
 80000000
 80000000
@@ -57,7 +55,9 @@ ffffffff
 80000000
 80000000
 80000000
-ffffffff
+80000000
+80000000
+80000000
 ffff8000
 ff800000
 f8000000
@@ -203,6 +203,6 @@ fffffffe
 ffffffff
 fffffc00
 ffffffff
-ffffffff
-ffffffff
+fffffff0
+fffffff0
 00000000

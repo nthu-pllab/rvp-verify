@@ -5,8 +5,7 @@
 # It checks two independent things:
 #   ① ENCODING  — the P-aware binutils assembles `<mnem> a5,a3,a4`, and the Sail
 #                 emulator decodes those exact bytes back to <mnem>. Catches wrong
-#                 bits / encoding collisions (e.g. the PALUW_32ONLY-vs-PALUH
-#                 shadowing that made aadd decode as paadd.h).
+#                 bits and two clauses claiming the same encoding.
 #   ② SEMANTICS — for each `rs1,rs2 => expected` case you give, Sail must compute
 #                 `expected` into rd. YOU supply `expected` from the P spec
 #                 (https://www.jhauser.us/RISCV/ext-P/); this harness confirms Sail
@@ -21,7 +20,7 @@
 #
 # Examples:
 #   ./verify_insn.sh aadd "6,4=>5" "-0x80000000,0x7fffffff=>0xffffffff"
-#   ./verify_insn.sh paadd.b "0x01020304,0x10203040=>0x11223344"
+#   ./verify_insn.sh paadd.b "0x01020304,0x10203040=>0x08111922"   # averaging add
 #
 # Env overrides: XLEN (32|64, default 32), AS, LD, OD, SAIL, SAIL_CFG
 set -uo pipefail
@@ -47,7 +46,7 @@ if [ -t 1 ]; then G=$'\033[32m'; R=$'\033[31m'; Y=$'\033[33m'; B=$'\033[1m'; N=$
 die() { echo "${R}error:${N} $*" >&2; exit 2; }
 [ $# -ge 1 ] || die "usage: $0 <mnemonic> \"rs1,rs2=>expected\" ..."
 [ -x "$AS" ]   || die "P-aware as not found: $AS (build riscv-binutils, see README.md)"
-[ -x "$SAIL" ] || die "Sail sim not found: $SAIL (build it: cd sail-riscv && ./build_simulator.sh)"
+[ -x "$SAIL" ] || die "Sail sim not found: $SAIL (run ./build.sh first)"
 
 MNEM="$1"; shift
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/verify_insn.XXXXXX")"
@@ -64,7 +63,7 @@ run_sail() { # $1 = asm file
   "$AS" -march=$MARCH -mabi=$MABI "$1" -o "$TMP/p.o" 2>"$TMP/as.err" || return 1
   $LD $LDEMU -Ttext-segment=0x80000000 -e _start "$TMP/p.o" -o "$TMP/p.elf" 2>/dev/null || return 1
   "$SAIL" --config "$SAIL_CFG" --enable-experimental-extensions \
-          --inst-limit 16 --trace-instr --trace-reg --use-abi-names "$TMP/p.elf" 2>&1
+          --inst-limit 64 --trace-instr --trace-reg --use-abi-names "$TMP/p.elf" 2>&1
 }
 
 echo "${B}== verify $MNEM  (rv$XLEN, Sail model) ==${N}"
@@ -116,6 +115,10 @@ _start:
 EOF
   trace=$(run_sail "$TMP/sem.s") || { echo "${R}✗${N} $rs1,$rs2  (assemble/link failed)"; fail=$((fail+1)); continue; }
   got=$(printf '%s' "$trace" | grep -E "a5 <-" | tail -1 | grep -oiE "0x[0-9a-f]+" | head -1 | sed 's/^0[xX]//' | tr 'A-F' 'a-f')
+  if [ -z "$got" ]; then
+    printf "${R}✗${N} %-22s %s => a5 was never written (illegal instruction, or the program did not reach it)\n" "$rs1,$rs2" "$MNEM"
+    fail=$((fail+1)); continue
+  fi
   got=$(printf '%0*s' "$W" "$got" | tr ' ' '0')   # pad
   if [ "$got" = "$want" ]; then
     printf "${G}✓${N} %-22s %s => got 0x%s\n" "$rs1,$rs2" "$MNEM" "$got"

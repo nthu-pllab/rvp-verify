@@ -20,8 +20,8 @@ working tree, which carried these never-committed changes:
   plus a 2026-08-03 fix at 7 sites for Python 3.13's `locals()`/`eval`
   semantics (the generator crashed on 3.13 otherwise).
 - `env/arch-test/test_macros.h` — the P `TEST_PAIR_*` macros (~150 lines on top
-  of upstream). `arch_test.h`, `encoding.h`, `test_macros_vector.h` are
-  upstream as of that commit.
+  of upstream). `arch_test.h` and `encoding.h` are upstream as of that commit
+  (`test_macros_vector.h` is not needed by the P tests and was not copied).
 
 Excluded on purpose: `riscv-isac/` (the regeneration flow installs riscv_isac
 from PyPI and patches it in `setup_ctg_venv.sh`; the lab's local isac edits are
@@ -36,8 +36,11 @@ reference, so it must precede them on the riscv_ctg command line.
 ## `env/sail/`
 
 `model_test.h` + `link.ld` from the lab RISCOF sail plugin
-(`rvp/test-32/sail_cSim/env` in ChiaHuiSu's `rvp.tar.gz` environment),
-unmodified.
+(`rvp/test-32/sail_cSim/env` in ChiaHuiSu's `rvp.tar.gz` environment). Both
+derive from riscv-arch-test's `riscof-plugins/rv32/sail_cSim/env/`
+(BSD-3-Clause, RISC-V International): `link.ld` is identical to the copy at
+`3aa9b50e`, `model_test.h` is a trimmed variant of it (same RVMODEL_* macros,
+without the XLEN-dependent alignment block).
 
 ## `results/baseline/`
 
